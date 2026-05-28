@@ -3,17 +3,19 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 
 import { DEFAULT_MODEL_OPTION, sanitizeCustomModel } from './models.js';
+import { isSandboxModeEnabled } from '../sandbox-mode.js';
 import type {
   RuntimeAgentDef,
   RuntimeBuildOptions,
   RuntimeModelOption,
 } from './types.js';
 
-function localAgentProfilesFile(): string {
+function localAgentProfilesFile(): string | null {
   const explicit = process.env.OD_AGENT_PROFILES_CONFIG;
   if (typeof explicit === 'string' && explicit.trim()) {
     return explicit.trim();
   }
+  if (isSandboxModeEnabled(process.env)) return null;
   return path.join(homedir(), '.open-design', 'agents.local.json');
 }
 
@@ -152,9 +154,11 @@ function createLocalAgentDef(
 export function readLocalAgentProfileDefs(
   baseDefs: RuntimeAgentDef[],
 ): RuntimeAgentDef[] {
+  const profilesFile = localAgentProfilesFile();
+  if (profilesFile == null) return [];
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(localAgentProfilesFile(), 'utf8'));
+    parsed = JSON.parse(readFileSync(profilesFile, 'utf8'));
   } catch {
     return [];
   }

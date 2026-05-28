@@ -4,6 +4,7 @@ import path from 'node:path';
 import { homedir } from 'node:os';
 import { wellKnownUserToolchainBins } from '@open-design/platform';
 import { expandHomePath } from './paths.js';
+import { isSandboxModeEnabled } from '../sandbox-mode.js';
 import type { RuntimeAgentDef } from './types.js';
 
 const AGENT_BIN_ENV_KEYS = new Map<string, string>([
@@ -35,7 +36,11 @@ let cachedToolchainDirs: string[] | null = null;
 let cachedToolchainDirsAt = 0;
 
 function userToolchainDirs() {
-  const homeOverride = process.env.OD_AGENT_HOME;
+  const sandboxHome =
+    isSandboxModeEnabled(process.env) && process.env.OD_DATA_DIR
+      ? path.join(process.env.OD_DATA_DIR, 'sandbox', 'agent-home')
+      : '';
+  const homeOverride = process.env.OD_AGENT_HOME || sandboxHome;
   const home = homeOverride || homedir();
   const now = Date.now();
   if (

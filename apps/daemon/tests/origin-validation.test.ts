@@ -7,6 +7,7 @@ import {
   allowedBrowserPorts,
   configuredAllowedOrigins,
   isAllowedBrowserOrigin,
+  isConfiguredSameOriginBrowserRequest,
   isLocalSameOrigin,
   isZeroConfigClipperLibraryRequest,
 } from '../src/origin-validation.js';
@@ -772,5 +773,62 @@ describe('isLocalSameOrigin: Sec-Fetch-Site fallback for no-Origin same-origin G
       },
     };
     expect(isLocalSameOrigin(req, 7456, env)).toBe(false);
+  });
+});
+
+describe('isConfiguredSameOriginBrowserRequest', () => {
+  const ALLOWED = 'https://od.example.com';
+  const previousAllowedOrigins = process.env.OD_ALLOWED_ORIGINS;
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    OD_ALLOWED_ORIGINS: ALLOWED,
+    OD_BIND_HOST: '0.0.0.0',
+  };
+
+  beforeAll(() => {
+    process.env.OD_ALLOWED_ORIGINS = ALLOWED;
+  });
+  afterAll(() => {
+    if (previousAllowedOrigins === undefined) delete process.env.OD_ALLOWED_ORIGINS;
+    else process.env.OD_ALLOWED_ORIGINS = previousAllowedOrigins;
+  });
+
+  it('accepts an explicit configured browser Origin', () => {
+    const req = {
+      headers: {
+        host: '127.0.0.1:7456',
+        origin: ALLOWED,
+      },
+    };
+    expect(isConfiguredSameOriginBrowserRequest(req, 7456, env)).toBe(true);
+  });
+
+  it('accepts no-Origin same-origin browser GET shape for a configured public Host', () => {
+    const req = {
+      headers: {
+        host: 'od.example.com',
+        'sec-fetch-site': 'same-origin',
+      },
+    };
+    expect(isConfiguredSameOriginBrowserRequest(req, 7456, env)).toBe(true);
+  });
+
+  it('rejects no-Origin non-browser requests even when Host matches', () => {
+    const req = {
+      headers: {
+        host: 'od.example.com',
+      },
+    };
+    expect(isConfiguredSameOriginBrowserRequest(req, 7456, env)).toBe(false);
+  });
+
+  it('rejects foreign origins', () => {
+    const req = {
+      headers: {
+        host: '127.0.0.1:7456',
+        origin: 'https://evil.example.com',
+      },
+    };
+    expect(isConfiguredSameOriginBrowserRequest(req, 7456, env)).toBe(false);
   });
 });

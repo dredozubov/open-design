@@ -197,6 +197,25 @@ export function isLocalSameOrigin(
   return isAllowedBrowserOrigin(origin, host, ports, bindHost, extraAllowedOrigins);
 }
 
+export function isConfiguredSameOriginBrowserRequest(
+  req: RequestWithOriginHeaders,
+  port: number | string | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const extraAllowedOrigins = configuredAllowedOrigins(env);
+  if (extraAllowedOrigins.length === 0) return false;
+
+  const origin = headerValue(req.headers?.origin);
+  if (origin != null && origin !== '') {
+    return extraAllowedOrigins.includes(origin) && isLocalSameOrigin(req, port, env);
+  }
+
+  if (headerValue(req.headers?.['sec-fetch-site']) !== 'same-origin') return false;
+  const requestHost = parseHostHeader(req.headers?.host);
+  if (!requestHost) return false;
+  return new Set(configuredAllowedHosts(extraAllowedOrigins)).has(requestHost.host);
+}
+
 function headerValue(value: unknown): string | undefined {
   if (Array.isArray(value)) {
     const first = value[0];

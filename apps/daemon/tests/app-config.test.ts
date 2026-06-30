@@ -55,6 +55,36 @@ describe('app-config', () => {
       expect(cfg.telemetry).toEqual(DEFAULT_TELEMETRY);
     });
 
+    it('returns persisted API credential source fields without secrets by default', async () => {
+      await writeFile(
+        path.join(dataDir, 'app-config.json'),
+        JSON.stringify({
+          onboardingCompleted: true,
+          mode: 'api',
+          apiProtocol: 'openai',
+          apiCredentialSource: 'deployment',
+          apiKey: '',
+          baseUrl: '',
+          model: 'deployment-chat-model',
+          apiVersion: '',
+          apiProviderBaseUrl: null,
+        }),
+      );
+      const cfg = await readAppConfig(dataDir);
+      expect(cfg).toMatchObject({
+        onboardingCompleted: true,
+        mode: 'api',
+        apiProtocol: 'openai',
+        apiCredentialSource: 'deployment',
+        apiKey: '',
+        baseUrl: '',
+        model: 'deployment-chat-model',
+        apiVersion: '',
+        apiProviderBaseUrl: null,
+        telemetry: DEFAULT_TELEMETRY,
+      });
+    });
+
     it('returns default telemetry for corrupted JSON without crashing', async () => {
       await writeFile(path.join(dataDir, 'app-config.json'), '{not valid');
       const cfg = await readAppConfig(dataDir);
@@ -89,6 +119,10 @@ describe('app-config', () => {
         path.join(dataDir, 'app-config.json'),
         JSON.stringify({
           onboardingCompleted: 'yes',
+          mode: 'cloud',
+          apiProtocol: 'bad-protocol',
+          apiCredentialSource: 'browser',
+          apiProviderBaseUrl: 12,
           agentId: 123,
           skillId: { id: 'bad' },
           designSystemId: ['bad'],

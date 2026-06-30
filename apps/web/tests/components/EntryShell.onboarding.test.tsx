@@ -30,11 +30,30 @@ vi.mock('../../src/analytics/provider', async (importOriginal) => {
 
 const originalFetch = globalThis.fetch;
 const originalResizeObserver = globalThis.ResizeObserver;
+const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
 
 class ResizeObserverMock {
   observe() {}
   disconnect() {}
   unobserve() {}
+}
+
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: vi.fn(() => store.clear()),
+    getItem: vi.fn((key: string) => store.get(key) ?? null),
+    key: vi.fn((index: number) => Array.from(store.keys())[index] ?? null),
+    removeItem: vi.fn((key: string) => {
+      store.delete(key);
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      store.set(key, String(value));
+    }),
+  } as Storage;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -278,6 +297,9 @@ afterEach(() => {
   cleanup();
   globalThis.fetch = originalFetch;
   globalThis.ResizeObserver = originalResizeObserver;
+  if (originalLocalStorageDescriptor) {
+    Object.defineProperty(window, 'localStorage', originalLocalStorageDescriptor);
+  }
   vi.useRealTimers();
   analyticsMocks.track.mockReset();
   window.sessionStorage.clear();
@@ -286,6 +308,10 @@ afterEach(() => {
 beforeEach(() => {
   globalThis.fetch = originalFetch;
   globalThis.ResizeObserver = ResizeObserverMock as typeof ResizeObserver;
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: createMemoryStorage(),
+  });
   analyticsMocks.track.mockReset();
 });
 

@@ -100,8 +100,28 @@ export interface ProjectLocationPrefs {
   path: string;
 }
 
+export type AppConfigExecMode = 'daemon' | 'api';
+export type AppConfigApiProtocol =
+  | 'anthropic'
+  | 'openai'
+  | 'azure'
+  | 'google'
+  | 'ollama'
+  | 'senseaudio'
+  | 'aihubmix'
+  | 'bedrock';
+export type AppConfigProviderCredentialSource = 'user' | 'deployment';
+
 export interface AppConfigPrefs {
   onboardingCompleted?: boolean;
+  mode?: AppConfigExecMode;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  apiCredentialSource?: AppConfigProviderCredentialSource;
+  apiProtocol?: AppConfigApiProtocol;
+  apiVersion?: string;
+  apiProviderBaseUrl?: string | null;
   agentId?: string | null;
   agentModels?: Record<string, AgentModelPrefs>;
   agentCliEnv?: AgentCliEnvPrefs;
@@ -130,6 +150,14 @@ export const RECENT_LINKED_DIRS_MAX = 5;
 
 const ALLOWED_KEYS: ReadonlySet<keyof AppConfigPrefs> = new Set([
   'onboardingCompleted',
+  'mode',
+  'apiKey',
+  'baseUrl',
+  'model',
+  'apiCredentialSource',
+  'apiProtocol',
+  'apiVersion',
+  'apiProviderBaseUrl',
   'agentId',
   'agentModels',
   'agentCliEnv',
@@ -167,6 +195,17 @@ const TELEMETRY_KEYS: ReadonlySet<string> = new Set([
   'metrics',
   'content',
   'artifactManifest',
+]);
+
+const API_PROTOCOLS: ReadonlySet<string> = new Set([
+  'anthropic',
+  'openai',
+  'azure',
+  'google',
+  'ollama',
+  'senseaudio',
+  'aihubmix',
+  'bedrock',
 ]);
 
 function validateTelemetry(raw: unknown): TelemetryPrefs | undefined {
@@ -470,6 +509,26 @@ function applyConfigValue(
 ): void {
   if (key === 'onboardingCompleted') {
     if (typeof value === 'boolean') target[key] = value;
+    return;
+  }
+  if (key === 'mode') {
+    if (value === 'daemon' || value === 'api') target[key] = value;
+    return;
+  }
+  if (key === 'apiKey' || key === 'baseUrl' || key === 'model' || key === 'apiVersion') {
+    if (typeof value === 'string') target[key] = value;
+    return;
+  }
+  if (key === 'apiCredentialSource') {
+    if (value === 'user' || value === 'deployment') target[key] = value;
+    return;
+  }
+  if (key === 'apiProtocol') {
+    if (typeof value === 'string' && API_PROTOCOLS.has(value)) target[key] = value;
+    return;
+  }
+  if (key === 'apiProviderBaseUrl') {
+    if (typeof value === 'string' || value === null) target[key] = value;
     return;
   }
   if (key === 'agentId' || key === 'skillId' || key === 'designSystemId') {

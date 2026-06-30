@@ -26,8 +26,28 @@ export interface ProjectLocationPrefs {
   path: string;
 }
 
+export type AppConfigExecMode = 'daemon' | 'api';
+export type AppConfigApiProtocol =
+  | 'anthropic'
+  | 'openai'
+  | 'azure'
+  | 'google'
+  | 'ollama'
+  | 'senseaudio'
+  | 'aihubmix'
+  | 'bedrock';
+export type AppConfigProviderCredentialSource = 'user' | 'deployment';
+
 export interface AppConfigPrefs {
   onboardingCompleted?: boolean;
+  mode?: AppConfigExecMode;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  apiCredentialSource?: AppConfigProviderCredentialSource;
+  apiProtocol?: AppConfigApiProtocol;
+  apiVersion?: string;
+  apiProviderBaseUrl?: string | null;
   agentId?: string | null;
   agentModels?: Record<string, AgentModelPrefs>;
   agentCliEnv?: AgentCliEnvPrefs;

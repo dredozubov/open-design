@@ -154,6 +154,38 @@ describe('syncConfigToDaemon', () => {
       telemetry: { metrics: true, content: true, artifactManifest: false },
     });
   });
+
+  it('syncs deployment provider API mode without browser-held credentials', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await syncConfigToDaemon({
+      ...DEFAULT_CONFIG,
+      mode: 'api',
+      apiProtocol: 'openai',
+      apiCredentialSource: 'deployment',
+      apiKey: '',
+      baseUrl: '',
+      model: 'deployment-chat-model',
+      onboardingCompleted: true,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      onboardingCompleted: true,
+      mode: 'api',
+      apiProtocol: 'openai',
+      apiCredentialSource: 'deployment',
+      apiKey: '',
+      baseUrl: '',
+      model: 'deployment-chat-model',
+      apiVersion: '',
+      apiProviderBaseUrl: null,
+    });
+  });
 });
 
 describe('syncMediaProvidersToDaemon', () => {
@@ -239,6 +271,57 @@ describe('mergeDaemonConfig', () => {
     expect(merged.installationId).toBe('install-1');
     expect(merged.privacyDecisionAt).toBe(1778244000000);
     expect(merged.telemetry).toEqual({ metrics: true });
+  });
+
+  it('applies daemon-persisted deployment provider API mode', () => {
+    const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
+      onboardingCompleted: true,
+      mode: 'api',
+      apiProtocol: 'openai',
+      apiCredentialSource: 'deployment',
+      apiKey: '',
+      baseUrl: '',
+      model: 'deployment-chat-model',
+      apiVersion: '',
+      apiProviderBaseUrl: null,
+    });
+
+    expect(merged).toMatchObject({
+      onboardingCompleted: true,
+      mode: 'api',
+      apiProtocol: 'openai',
+      apiCredentialSource: 'deployment',
+      apiKey: '',
+      baseUrl: '',
+      model: 'deployment-chat-model',
+      apiVersion: '',
+      apiProviderBaseUrl: null,
+    });
+  });
+
+  it('does not let daemon-persisted user mode clear browser-owned BYOK credentials', () => {
+    const merged = mergeDaemonConfig(
+      {
+        ...DEFAULT_CONFIG,
+        mode: 'api',
+        apiProtocol: 'openai',
+        apiCredentialSource: 'user',
+        apiKey: 'sk-local-user-key',
+        baseUrl: 'https://user.example.test/v1',
+        model: 'user-model',
+      },
+      {
+        mode: 'api',
+        apiProtocol: 'openai',
+        apiCredentialSource: 'user',
+        apiKey: '',
+        baseUrl: '',
+        model: 'user-model',
+      },
+    );
+
+    expect(merged.apiKey).toBe('sk-local-user-key');
+    expect(merged.baseUrl).toBe('https://user.example.test/v1');
   });
 
   it('migrates old daemon privacy config to a resolved decision', () => {

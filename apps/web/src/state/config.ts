@@ -871,6 +871,31 @@ export function mergeDaemonConfig(
   if (daemonConfig.onboardingCompleted != null) {
     next.onboardingCompleted = daemonConfig.onboardingCompleted;
   }
+  if (daemonConfig.mode === 'daemon' || daemonConfig.mode === 'api') {
+    next.mode = daemonConfig.mode;
+  }
+  const daemonCredentialSource = daemonConfig.apiCredentialSource;
+  if (daemonCredentialSource === 'deployment' && typeof daemonConfig.apiKey === 'string') {
+    next.apiKey = daemonConfig.apiKey;
+  }
+  if (daemonCredentialSource === 'deployment' && typeof daemonConfig.baseUrl === 'string') {
+    next.baseUrl = daemonConfig.baseUrl;
+  }
+  if (typeof daemonConfig.model === 'string') {
+    next.model = daemonConfig.model;
+  }
+  if (daemonCredentialSource === 'user' || daemonCredentialSource === 'deployment') {
+    next.apiCredentialSource = daemonConfig.apiCredentialSource;
+  }
+  if (daemonConfig.apiProtocol) {
+    next.apiProtocol = daemonConfig.apiProtocol;
+  }
+  if (typeof daemonConfig.apiVersion === 'string') {
+    next.apiVersion = daemonConfig.apiVersion;
+  }
+  if (typeof daemonConfig.apiProviderBaseUrl === 'string' || daemonConfig.apiProviderBaseUrl === null) {
+    next.apiProviderBaseUrl = daemonConfig.apiProviderBaseUrl;
+  }
   if (daemonConfig.agentId !== undefined) {
     next.agentId = daemonConfig.agentId;
   }
@@ -1047,8 +1072,18 @@ export async function syncConfigToDaemon(
   config: AppConfig,
   options?: { throwOnError?: boolean },
 ): Promise<void> {
+  const deploymentCredentialSource = config.apiCredentialSource === 'deployment';
   const prefs: AppConfigPrefs = {
     onboardingCompleted: config.onboardingCompleted,
+    mode: config.mode,
+    // API credentials stay browser-owned for direct BYOK and daemon-owned for
+    // deployment provider mode. The daemon app-config records only routing
+    // shape, never provider secret material.
+    model: config.model,
+    apiCredentialSource: deploymentCredentialSource ? 'deployment' : 'user',
+    apiProtocol: config.apiProtocol,
+    apiVersion: config.apiVersion ?? '',
+    apiProviderBaseUrl: deploymentCredentialSource ? null : config.apiProviderBaseUrl ?? null,
     agentId: config.agentId,
     agentModels: config.agentModels,
     agentCliEnv: config.agentCliEnv,
@@ -1065,6 +1100,10 @@ export async function syncConfigToDaemon(
     projectLocations: config.projectLocations ?? [],
     defaultProjectLocationId: config.defaultProjectLocationId ?? 'default',
   };
+  if (deploymentCredentialSource) {
+    prefs.apiKey = '';
+    prefs.baseUrl = '';
+  }
   try {
     const response = await fetch('/api/app-config', {
       method: 'PUT',

@@ -4,6 +4,8 @@ import type { MediaExecutionPolicy } from '@open-design/contracts';
 import { defaultMediaExecutionPolicy, mediaPolicyDenial } from '../media/policy.js';
 import type { RouteDeps } from '../server-context.js';
 import { proxyDispatcherRequestInit } from '../connectionTest.js';
+import type { AppConfigPrefs } from '../app-config.js';
+import { deploymentProviderConfig } from '../deployment-provider.js';
 import {
   aihubmixCatalogUrl,
   parseAIHubMixCatalog,
@@ -342,7 +344,11 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
       return res.status(403).json({ error: 'cross-origin request rejected' });
     }
     try {
-      const config = await readAppConfig(RUNTIME_DATA_DIR);
+      let config = await readAppConfig(RUNTIME_DATA_DIR);
+      const deploymentPatch = deploymentProviderAppConfigPatch(config);
+      if (deploymentPatch) {
+        config = await writeAppConfig(RUNTIME_DATA_DIR, deploymentPatch);
+      }
       res.json({ config });
     } catch (err: any) {
       res
@@ -647,4 +653,33 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
   // metadata as listFiles so the client can stage them as ChatAttachments
   // without a separate refetch.
 
+}
+
+export function deploymentProviderAppConfigPatch(config: AppConfigPrefs): Partial<AppConfigPrefs> | null {
+  const providerConfig = deploymentProviderConfig();
+  if (!providerConfig.available) return null;
+
+  const persistedDeploymentMode =
+    config.mode === 'api' &&
+    config.apiProtocol === 'openai' &&
+    config.apiCredentialSource === 'deployment';
+  const model = persistedDeploymentMode && typeof config.model === 'string' && config.model.trim()
+    ? config.model.trim()
+    : providerConfig.defaultModel?.trim() ?? '';
+
+  const desired: Partial<AppConfigPrefs> = {
+    onboardingCompleted: true,
+    mode: 'api',
+    apiProtocol: 'openai',
+    apiCredentialSource: 'deployment',
+    apiKey: '',
+    baseUrl: '',
+    model,
+    apiVersion: '',
+    apiProviderBaseUrl: null,
+  };
+  for (const [key, value] of Object.entries(desired)) {
+    if ((config as Record<string, unknown>)[key] !== value) return desired;
+  }
+  return null;
 }
